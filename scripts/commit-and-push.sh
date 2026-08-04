@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
 #
-# Commit and push ALL local changes in this server checkout, then update.
+# Commit and push all local changes in the server checkout, then it is
+# safe to `git pull` and redeploy.
 #
-# The bot writes its own state straight into this repo's checkout on the
-# server: memories/ and prompts/project.md are bind-mounted read-write,
-# and the agent may also edit other tracked files (e.g. access.json).
-# Any uncommitted change to a file that also changed upstream blocks
-# `git pull` and breaks updates. To keep the checkout always pullable we
-# commit everything here.
+# The bot writes its memories straight into the server's git checkout but
+# never commits them. Uncommitted changes block `git pull` when the same
+# file changed upstream, which breaks deploys. Committing everything first
+# keeps the checkout clean:
 #
-# `git add -A` respects .gitignore, so secrets (.env) and host-only
-# runtime data (data/, memories/self/) are never committed — only
-# tracked files are.
+#   ./scripts/commit-and-push.sh && git pull --rebase && docker compose up -d --build
+#
+# `git add -A` respects .gitignore, so secrets in .env and runtime data under
+# data/ are never committed. Tracked configuration and persona files are
+# included deliberately, along with tracked memories and access-policy edits.
 #
 # When there is something to commit, the script rebases on top of the
-# remote (the server may be behind) and pushes. `[skip ci]` in the commit
-# message keeps the push from triggering CI, should this repo ever get a
-# deploy workflow. Safe to run anytime, including via cron. `make update`
-# runs this right before `git pull`.
+# remote (the server may be behind — a deploy is usually triggered by a
+# push) and pushes. `[skip ci]` keeps the push from triggering another
+# deploy. Safe to run anytime, including via cron.
 
 set -euo pipefail
 
@@ -40,7 +40,7 @@ if git diff --cached --quiet; then
     exit 0
 fi
 
-git -c user.name="hamroh" -c user.email="hamroh@localhost" \
+git -c user.name="Shahnoza Bot" -c user.email="shahnoza@localhost" \
     commit -m "sync server state [skip ci]"
 git pull --rebase
 git push

@@ -1,28 +1,25 @@
-# hamroh-custom-agent
+# Shahnoza Telegram Agent
 
-A ready-to-fork **template** for running your own persona on top of the
-[hamroh](https://github.com/Rustam-Z/hamroh) framework. hamroh is pinned as a
-git submodule under `framework/`; this repo owns only *your* agent's identity —
-persona, skills, memories, MCP config, reminders, and access. No framework code
-is forked, so bumping the submodule keeps the engine up to date.
+A deployable Telegram AI assistant developed and customized by **Jonibek
+Sharipov**. It uses the [hamroh](https://github.com/sharipovjonibek/hamroh)
+runtime pinned as a git submodule under `framework/`; this repository owns
+Shahnoza's persona, skills, memories, MCP config, reminders, and access policy.
 
-> **Using this template:** click "Use this template" on GitHub (or clone it),
-> then make it yours — set the persona in `prompts/project.md`, drop your
-> secrets into `.env`, and enable the MCPs you want in `plugins.json`.
+Shahnoza identifies Jonibek Sharipov as the developer of this version. Internal
+runtime implementation details are not part of her public-facing identity.
 
 ## Setup
 
 ```bash
-git clone --recurse-submodules https://github.com/<you>/hamroh-custom-agent && cd hamroh-custom-agent
+git clone --recurse-submodules https://github.com/sharipovjonibek/hamroh-custom-agent && cd hamroh-custom-agent
 # already cloned without --recurse-submodules?
 git submodule update --init
 
-claude setup-token      # opens a browser; prints a sk-ant-oat01-… token for .env
+cp .env.example .env    # set TELEGRAM_BOT_TOKEN and HAMROH_OWNER_ID only
+chmod 600 .env
 
-cp .env.example .env    # set TELEGRAM_BOT_TOKEN, HAMROH_OWNER_ID,
-                        # CLAUDE_CODE_OAUTH_TOKEN, HAMROH_MODEL
-
-make up                 # build framework image + your agent image, start the bot
+make auth               # build, then sign the bot into your ChatGPT account once
+make up                 # start Shahnoza
 make logs
 ```
 
@@ -30,10 +27,30 @@ make logs
 your agent on top of it and start it. `docker compose up` alone won't work: the
 `Dockerfile` needs `hamroh-base` to exist first.
 
-Claude Code auth comes from `CLAUDE_CODE_OAUTH_TOKEN` in `.env` — generate it
-once with `claude setup-token` (works with a Claude subscription or API) and
-paste the `sk-ant-oat01-…` token in. This is the login path on every OS; no
-`claude login` / Keychain / mounted credentials needed.
+The agent runs through the official Codex Python SDK. `make auth` prints a
+ChatGPT authorization URL and waits for the browser to return to the local
+OAuth callback on port `1455`. Open that URL on this computer and finish
+signing in. The resulting login is stored in a private Docker volume named
+`codex-home`. It does not mount your personal `~/.codex`, and a ChatGPT/Codex
+subscription does not need an OpenAI API key here. Check it later with
+`make auth-status`.
+
+Device-code login is not enabled by default. On a remote or headless machine
+where the localhost browser callback cannot be forwarded, invoke it explicitly
+as a fallback:
+
+```bash
+docker compose run --rm codex-auth python -m hamroh.codex_login --device-code
+```
+
+If Docker says it cannot access `/var/run/docker.sock`, add your login user to
+the Docker group, then log out and back in:
+
+```bash
+sudo usermod -aG docker "$USER"
+```
+
+Do not work around that with `chmod 666 /var/run/docker.sock` or `sudo make up`.
 
 ## Updating the framework
 
@@ -69,8 +86,9 @@ To do this automatically on every pull, set it once per machine:
 git config --global submodule.recurse true
 ```
 
-Either way, no files to re-copy — `system.md`, `subagents.md`, and the built-in
-skills are rebuilt from the submodule at build time (`make up`).
+Either way, no framework files need to be copied — `system.md`,
+`subagents.md`, and the skill runtime are rebuilt from the submodule at build
+time (`make up`).
 
 ## Updating a deployed bot
 
@@ -101,19 +119,19 @@ Skim the merged file if you both touched the same lines.
 Two layers:
 
 - **`framework/`** — the hamroh engine, pinned as a git submodule to one exact
-  commit. It ships the Dockerfile, the base system prompt, the built-in skills,
+  commit. It ships the Dockerfile, the base system prompt, the skill runtime,
   and all the Python. You never edit it.
 - **This repo** — your agent's identity. The build stacks it onto the framework:
 
 ```
 agent image = hamroh-base (built from framework/) + your agent baked on top
-├── /app/hamroh                engine + framework skills                (framework)
-├── /app/prompts/ (system.md,  ← COPY framework/prompts/                (from submodule)
-│      subagents.md, …)
-├── /app/prompts/project.md    ← COPY prompts/project.md                (this repo)
-└── /app/skills/<yours>        ← COPY skills/  (merges onto built-ins)  (this repo)
+├── /app/hamroh                engine                                  (framework)
+└── /app/prompts/ (system.md,  ← COPY framework/prompts/               (from submodule)
+       subagents.md, …)
 
-mounted live at runtime (nothing baked there to hide):
+mounted live at runtime:
+├── /app/prompts/project.md      ◄── ./prompts/project.md
+├── /app/skills/                 ◄── ./skills/ (custom skills, if any)
 ├── /app/plugins.json            ◄── ./plugins.json
 ├── /app/access.json             ◄── ./access.json
 ├── /app/default-reminders.json  ◄── ./default-reminders.json
@@ -121,14 +139,12 @@ mounted live at runtime (nothing baked there to hide):
 └── /app/data/                   ◄── ./data/
 ```
 
-**Why `prompts/` and `skills/` are baked, not mounted.** A directory bind-mount
-*masks* whatever the image baked at that path — it replaces, it doesn't merge.
-The image fills `/app/prompts` (`system.md`) and `/app/skills` (the built-ins),
-so mounting your own folder there would hide them. A Dockerfile `COPY` merges
-instead: the framework's files survive and yours are added on top. Single files
-(`plugins.json`, `access.json`, `default-reminders.json`) and dirs the image
-leaves empty (`memories/`, `data/`) have nothing to mask, so those stay mounts
-— and stay live-editable.
+The image still contains fallback copies of `project.md` and `skills/`, but the
+Compose deployment overlays them with this checkout. `project.md` is mounted as
+one file so it cannot hide the framework's `system.md`; `skills/` is mounted as
+a whole directory because this repo owns Shahnoza's complete custom skill set.
+Prompts and the skill index are assembled at startup, so restart after editing
+either one.
 
 **When changes take effect:**
 
@@ -136,33 +152,33 @@ leaves empty (`memories/`, `data/`) have nothing to mask, so those stay mounts
 |---|---|
 | `access.json` | live (hot-reloaded) |
 | `memories/` | live (read and written on demand) |
-| `plugins.json`, `default-reminders.json` | on `docker compose restart` |
-| `prompts/`, `skills/` (baked) | on rebuild — `make up` |
+| `plugins.json`, `default-reminders.json` | on `docker compose restart agent` |
+| `prompts/project.md`, `skills/` | on `docker compose restart agent` |
 
 ## What this repo owns
 
 | File / dir | Configures | Git-tracked |
 |---|---|---|
-| `prompts/project.md` | Persona / system-prompt overlay (baked) | ✅ |
-| `skills/` | Your custom skills (baked; framework's are inherited) | ✅ |
+| `prompts/project.md` | Persona / developer-instruction overlay | ✅ |
+| `skills/` | Shahnoza-specific skill tree | ✅ |
 | `memories/` | The bot's memory — it reads and writes here | ✅ |
 | `plugins.json` | Tools + MCP capability surface | ✅ |
 | `default-reminders.json` | Scheduled reminders | ✅ |
 | `access.json` | Access policy (DM / group) | ✅ |
 | `Dockerfile` | Bakes the above onto the framework image | ✅ |
-| `.env` | Bot token, owner id, model, MCP secrets | ❌ secrets |
+| `.env` | Bot token, owner id, optional model, MCP secrets | ❌ secrets |
 | `data/` | SQLite, session state, logs | ❌ runtime |
 
-`system.md`, `subagents.md`, and the built-in skills are **not** in this repo —
-they come from the framework (baked at build). `access.json` is the tracked
-source of truth; owner commands `/allow`, `/deny`, `/dmpolicy` edit it live, so
-after using them commit the change to persist it.
+`system.md` and `subagents.md` are **not** maintained in this repo — they come
+from the framework at build time. `access.json` is the tracked source of truth;
+owner commands `/allow`, `/deny`, and `/policy` edit it live, so commit the
+change afterward if you want it preserved in Git.
 
 ## Customizing
 
-- **Persona** → edit `prompts/project.md` (set the name — it ships as `MyBot`),
-  then `make up` (baked).
-- **Skills** → drop a `skills/<name>/SKILL.md` folder, then `make up` (baked).
+- **Persona** → edit `prompts/project.md` (this checkout is already `Shahnoza`),
+  then `docker compose restart agent`.
+- **Skills** → drop a `skills/<name>/SKILL.md` folder, then restart the agent.
 - **MCPs** → in `plugins.json` set an MCP `"enabled": true`, add its secret to
   `.env`, then `docker compose restart`. See `framework/docs/tools.md`.
 - **Reminders** → add entries to `default-reminders.json`, then restart.

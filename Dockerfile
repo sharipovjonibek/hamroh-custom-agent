@@ -11,6 +11,6 @@ FROM hamroh-base
 COPY framework/prompts/ /app/prompts/
 COPY prompts/project.md /app/prompts/project.md
 
-# Custom skills merge onto the baked framework skills (none yet — drop
-# skills/<name>/SKILL.md folders here and rebuild).
+# Bake the complete skill tree as a standalone-image fallback. Compose overlays
+# this path with the same host directory so deployed skill edits persist.
 COPY skills/ /app/skills/

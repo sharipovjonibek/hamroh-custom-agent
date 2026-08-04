@@ -1,7 +1,10 @@
 services:
   agent:
     build: .                    # your Dockerfile — FROM hamroh-base (built by `make`)
+    image: shahnoza-agent:local
     env_file: .env
+    environment:
+      CODEX_HOME: /var/lib/codex
     restart: on-failure
     volumes:
       # prompts/ stays baked in the Dockerfile so the framework's system.md
@@ -9,13 +12,14 @@ services:
       # below, so the bot's instruction_append edits land in this checkout
       # and survive rebuilds (commit-and-push.sh commits them before pulls).
       - ./data:/app/data
+      # Bot-specific ChatGPT/Codex login. This named volume is deliberately
+      # separate from the operator's ~/.codex history and settings.
+      - codex-home:/var/lib/codex
       - ./prompts/project.md:/app/prompts/project.md
       # Skill playbooks — bind-mounted read-write so host edits AND the bot's
       # own write_skill land in this git-tracked checkout, live without a
-      # rebuild. The host skills/ tree now holds the framework built-ins
-      # (reminder-format, render-style, self-reflection) seeded alongside this
-      # bot's custom skills, so this whole-dir mount is the complete set the
-      # image expects — it masks the baked copy without dropping anything.
+      # rebuild. This whole-directory mount is Shahnoza's complete custom
+      # skill set and intentionally replaces the image's empty template tree.
       - ./skills:/app/skills
       # Read-write — the bot writes its own memories here; commit them
       # with scripts/commit-and-push.sh (make update does it for you).
@@ -23,11 +27,20 @@ services:
       - ./plugins.json:/app/plugins.json
       - ./access.json:/app/access.json
       - ./default-reminders.json:/app/default-reminders.json:ro
-      # Claude Code session files, so conversations resume across restarts.
-      # Auth is NOT taken from here — it comes from CLAUDE_CODE_OAUTH_TOKEN
-      # in .env (see .env.example). The env-var token takes precedence over
-      # any mounted credentials, so this works the same on Linux/macOS/Windows.
-      - ~/.claude:/root/.claude
-      - ~/.claude.json:/root/.claude.json
     working_dir: /app
     stop_grace_period: 15s
+
+  codex-auth:
+    image: shahnoza-agent:local
+    profiles: ["auth"]
+    # Browser OAuth returns to localhost:1455 on this Ubuntu host.
+    network_mode: host
+    environment:
+      CODEX_HOME: /var/lib/codex
+    volumes:
+      - codex-home:/var/lib/codex
+    working_dir: /app
+    command: ["python", "-m", "hamroh.codex_login"]
+
+volumes:
+  codex-home:

@@ -1,5 +1,5 @@
 {
-  "policy": "owner_only",
+  "policy": "allowlist",
   "allowed_users": [],
   "allowed_chats": []
 }

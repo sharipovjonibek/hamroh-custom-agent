@@ -3,3 +3,6 @@
 .git
 framework/.git
 data/
+.env
+.env.local
+.codex/
