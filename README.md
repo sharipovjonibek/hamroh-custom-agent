@@ -52,6 +52,23 @@ sudo usermod -aG docker "$USER"
 
 Do not work around that with `chmod 666 /var/run/docker.sock` or `sudo make up`.
 
+## Production on Railway
+
+Shahnoza has a dedicated self-contained Railway image, one-volume persistence,
+and an exact-volume, staged transfer for the already-working URL-based Codex
+login. The bootstrap validates and atomically promotes credentials without
+printing them. No Claude account, OpenAI API key, public domain, or device-code
+login is needed.
+
+Follow the beginner-friendly guide from start to finish:
+
+**[Deploy Shahnoza to Railway](docs/railway-deployment.md)**
+
+The production volume preserves SQLite/session state, Codex authentication,
+memories, persona edits, skills, plugins, reminders, and access policy across
+deployments. Run only one replica, and stop the local bot before the production
+cutover.
+
 ## Updating the framework
 
 The framework lives as a git submodule under `framework/`, pinned to one exact
@@ -90,7 +107,11 @@ Either way, no framework files need to be copied — `system.md`,
 `subagents.md`, and the skill runtime are rebuilt from the submodule at build
 time (`make up`).
 
-## Updating a deployed bot
+## Updating a self-managed Docker server
+
+This section is for a server running this repository with Docker Compose. A
+Railway deployment instead follows `main` automatically and keeps mutable state
+on its attached volume as described in the Railway guide above.
 
 On the server, update with one command:
 

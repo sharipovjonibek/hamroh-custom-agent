@@ -1,6 +1,8 @@
 # Secrets — never commit
 .env
 .env.local
+.railway/
+*auth*.json*
 
 # Runtime data (SQLite, runtime memories, logs, session id) — lives on the host
 data/

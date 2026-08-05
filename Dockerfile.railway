@@ -1,0 +1,65 @@
+# Railway builds this image directly from GitHub. Unlike the local development
+# Dockerfile, it must not depend on the laptop-only `hamroh-base` image or on
+# Railway checking out git submodules.
+
+FROM python:3.11-slim@sha256:db3ff2e1800a8581e2c48a27c3995339d47bdf046da21c7627accd3d51053a93 AS framework-source
+
+ARG HAMROH_COMMIT=3f8c53f8d1943d4813e4ad4c4d04f1692c015b4d
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates git \
+    && rm -rf /var/lib/apt/lists/* \
+    && git init /src \
+    && git -C /src remote add origin https://github.com/sharipovjonibek/hamroh.git \
+    && git -C /src fetch --depth=1 origin "${HAMROH_COMMIT}" \
+    && git -C /src checkout --detach FETCH_HEAD \
+    && test "$(git -C /src rev-parse HEAD)" = "${HAMROH_COMMIT}" \
+    && rm -rf /src/.git
+
+
+FROM python:3.11-slim@sha256:db3ff2e1800a8581e2c48a27c3995339d47bdf046da21c7627accd3d51053a93 AS builder
+
+COPY --from=ghcr.io/astral-sh/uv:0.11.29@sha256:eb2843a1e56fd9e30c7276ce1a52cba86e64c7b385f5e3279a0e08e02dd058fc /uv /usr/local/bin/uv
+WORKDIR /app
+COPY --from=framework-source /src/pyproject.toml /src/uv.lock ./
+RUN uv sync --frozen --no-install-project --no-cache
+
+
+FROM python:3.11-slim@sha256:db3ff2e1800a8581e2c48a27c3995339d47bdf046da21c7627accd3d51053a93 AS runtime
+
+# Node is used by optional npx MCP servers. tini gives Chromium and the Python
+# worker correct signal/zombie handling when Railway stops a deployment.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl ca-certificates tini \
+    && curl -fsSL https://deb.nodesource.com/setup_22.x | bash - \
+    && apt-get install -y --no-install-recommends nodejs \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /app/.venv /app/.venv
+ENV PATH="/app/.venv/bin:${PATH}" \
+    PYTHONUNBUFFERED=1 \
+    SHAHNOZA_STATE_ROOT=/data \
+    HAMROH_DATA_DIR=/data/hamroh \
+    CODEX_HOME=/data/codex \
+    HAMROH_MEMORIES_DIR=/data/memories \
+    HAMROH_ACCESS_PATH=/data/config/access.json \
+    HAMROH_REMINDERS_PATH=/data/config/default-reminders.json \
+    HAMROH_PLUGINS_PATH=/data/config/plugins.json
+
+WORKDIR /app
+RUN /app/.venv/bin/playwright install --with-deps chromium
+
+# The engine is fetched at the exact commit pinned above. Mutable Shahnoza
+# files are copied into a read-only seed directory; the bootstrap copies each
+# one into Railway's volume only when it is missing.
+COPY --from=framework-source /src/hamroh/ /app/hamroh/
+COPY --from=framework-source /src/prompts/ /app/prompts/
+COPY --from=framework-source /src/LICENSE /usr/share/licenses/hamroh/LICENSE
+COPY access.json default-reminders.json plugins.json /opt/shahnoza-seed/config/
+COPY prompts/project.md /opt/shahnoza-seed/config/project.md
+COPY skills/ /opt/shahnoza-seed/skills/
+COPY memories/ /opt/shahnoza-seed/memories/
+COPY scripts/railway_bootstrap.py /app/scripts/railway_bootstrap.py
+
+ENTRYPOINT ["/usr/bin/tini", "--", "python", "/app/scripts/railway_bootstrap.py"]
+CMD ["python", "-m", "hamroh"]

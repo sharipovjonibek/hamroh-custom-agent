@@ -1,8 +1,9 @@
-# Keep the build context small. The Dockerfile only needs prompts/, skills/,
-# and framework/prompts/subagents.md.
+# Keep local runtime state and credentials out of every image build context.
 .git
 framework/.git
 data/
 .env
 .env.local
 .codex/
+.railway/
+*auth*.json*

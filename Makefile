@@ -26,4 +26,17 @@ logs:
 down:
 	docker compose down
 
-.PHONY: build auth auth-status up update logs down
+railway-auth-export:
+	./scripts/export-railway-auth.sh
+
+railway-auth-upload:
+	./scripts/upload-railway-auth.sh
+
+railway-auth-retire-local:
+	./scripts/retire-local-auth.sh
+
+railway-smoke:
+	docker build -f Dockerfile.railway -t shahnoza-agent:railway-test .
+	./tests/smoke_railway_image.sh
+
+.PHONY: build auth auth-status up update logs down railway-auth-export railway-auth-upload railway-auth-retire-local railway-smoke
