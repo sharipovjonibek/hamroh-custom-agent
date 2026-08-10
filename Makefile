@@ -36,7 +36,7 @@ railway-auth-retire-local:
 	./scripts/retire-local-auth.sh
 
 railway-smoke:
-	docker build -f Dockerfile.railway -t shahnoza-agent:railway-test .
+	docker build -f Dockerfile.railway -t custom-agent:railway-test .
 	./tests/smoke_railway_image.sh
 
 .PHONY: build auth auth-status up update logs down railway-auth-export railway-auth-upload railway-auth-retire-local railway-smoke

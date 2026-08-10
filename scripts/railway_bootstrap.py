@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare Shahnoza's persistent Railway state, then start Hamroh.
+"""Prepare an agent's persistent Railway state, then start Hamroh.
 
 Railway mounts one persistent volume when the container starts. This bootstrap
 seeds mutable files on their first boot, preserves them on every later deploy,
@@ -41,7 +41,7 @@ RAILWAY_MARKERS = (
 AUTH_FILENAME = "auth.json"
 STAGED_AUTH_FILENAME = "auth.json.next"
 REQUIRED_CHATGPT_TOKEN_FIELDS = ("id_token", "access_token", "refresh_token")
-MAINTENANCE_SENTINEL = ".shahnoza-maintenance-ready"
+MAINTENANCE_SENTINEL = ".agent-maintenance-ready"
 
 
 def resolve_state_root(environ: MutableMapping[str, str]) -> Path:
@@ -53,7 +53,7 @@ def resolve_state_root(environ: MutableMapping[str, str]) -> Path:
             "Railway volume is missing. Attach one volume to this service and "
             "set its mount path to /data, then redeploy."
         )
-    raw = railway_mount or environ.get("SHAHNOZA_STATE_ROOT", "/data")
+    raw = railway_mount or environ.get("HAMROH_STATE_ROOT", "/data")
     root = Path(raw).expanduser()
     if not root.is_absolute():
         raise BootstrapError(f"persistent state path must be absolute: {root}")
@@ -171,7 +171,7 @@ def prepare_environment(
     *,
     environ: MutableMapping[str, str] | None = None,
     state_root: Path | None = None,
-    seed_root: Path = Path("/opt/shahnoza-seed"),
+    seed_root: Path = Path("/opt/agent-seed"),
     app_root: Path = Path("/app"),
     require_auth: bool = True,
 ) -> Path:
@@ -229,7 +229,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     command = list(sys.argv[1:] if argv is None else argv)
     if not command:
         raise BootstrapError("no application command was supplied")
-    maintenance = _enabled(os.environ, "SHAHNOZA_MAINTENANCE")
+    maintenance = _enabled(os.environ, "HAMROH_MAINTENANCE")
     state_root = resolve_state_root(os.environ)
     state_root.mkdir(parents=True, exist_ok=True)
     _set_maintenance_sentinel(
@@ -251,7 +251,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             message = str(exc)
             if message != last_auth_message:
                 print(
-                    f"[shahnoza-bootstrap] WAITING_FOR_CODEX_AUTH: {message}",
+                    f"[agent-bootstrap] WAITING_FOR_CODEX_AUTH: {message}",
                     file=sys.stderr,
                     flush=True,
                 )
@@ -260,7 +260,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             continue
         if had_staged_auth and not staged.exists():
             print(
-                "[shahnoza-bootstrap] STAGED_CODEX_AUTH_READY: "
+                "[agent-bootstrap] STAGED_CODEX_AUTH_READY: "
                 "validated and promoted atomically",
                 flush=True,
             )
@@ -272,7 +272,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                     environ=os.environ,
                 )
                 print(
-                    "[shahnoza-bootstrap] MAINTENANCE_READY: "
+                    "[agent-bootstrap] MAINTENANCE_READY: "
                     "Telegram and Codex are stopped; volume transfer is available",
                     flush=True,
                 )
@@ -280,7 +280,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             time.sleep(10)
             continue
         break
-    print(f"[shahnoza-bootstrap] persistent state ready at {root}", flush=True)
+    print(f"[agent-bootstrap] persistent state ready at {root}", flush=True)
     os.execvpe(command[0], command, os.environ)
     return 0
 
@@ -289,5 +289,5 @@ if __name__ == "__main__":
     try:
         raise SystemExit(main())
     except BootstrapError as exc:
-        print(f"[shahnoza-bootstrap] ERROR: {exc}", file=sys.stderr, flush=True)
+        print(f"[agent-bootstrap] ERROR: {exc}", file=sys.stderr, flush=True)
         raise SystemExit(78) from exc

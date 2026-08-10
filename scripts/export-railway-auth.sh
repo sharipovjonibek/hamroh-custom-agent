@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+source "$(dirname "$0")/agent-name.sh"
+load_agent_identity
+
 # Export the bot-specific Codex login without ever printing it. This file is
 # password-equivalent and is ignored by both Git and Docker.
 if (( $# != 0 )); then
@@ -41,7 +44,7 @@ fi
 if ! docker compose run --rm --no-deps -T --entrypoint sh codex-auth \
     -c 'test -s "$CODEX_HOME/auth.json" && cat "$CODEX_HOME/auth.json"' \
     >"$temporary"; then
-    echo "Could not read Shahnoza's isolated Codex login." >&2
+    echo "Could not read $AGENT_NAME's isolated Codex login." >&2
     echo "Run 'make auth' first, finish the URL login, then try again." >&2
     exit 1
 fi

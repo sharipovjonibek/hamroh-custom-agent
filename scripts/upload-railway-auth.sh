@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+source "$(dirname "$0")/agent-name.sh"
+load_agent_identity
+
 export_root=".railway/codex"
 export_path="$export_root/auth.json"
-expected_volume_name="shahnoza-data"
-expected_service_name="Shahnoza"
+expected_volume_name="agent-data"
+expected_service_name="agent"
 cleanup() {
     rm -f -- "$export_path" "$export_root"/auth.json.tmp.*
     rmdir --ignore-fail-on-non-empty "$export_root" .railway 2>/dev/null || true
@@ -68,11 +71,11 @@ if [[ "$has_current_auth" == "yes" ]]; then
 import json
 import sys
 
-value = str(json.load(sys.stdin).get("SHAHNOZA_MAINTENANCE", "")).lower()
+value = str(json.load(sys.stdin).get("HAMROH_MAINTENANCE", "")).lower()
 raise SystemExit(0 if value in {"1", "true", "yes", "on"} else 1)
 '; then
         echo "Railway already has a production login." >&2
-        echo "Enable SHAHNOZA_MAINTENANCE=true and wait for MAINTENANCE_READY first." >&2
+        echo "Enable HAMROH_MAINTENANCE=true and wait for MAINTENANCE_READY first." >&2
         exit 1
     fi
     root_listing="$(
@@ -83,7 +86,7 @@ import json
 import sys
 
 names = {item.get("name") for item in json.load(sys.stdin).get("files", [])}
-raise SystemExit(0 if ".shahnoza-maintenance-ready" in names else 1)
+raise SystemExit(0 if ".agent-maintenance-ready" in names else 1)
 ' <<<"$root_listing"; then
         echo "The active Railway deployment has not entered maintenance yet." >&2
         echo "Wait for MAINTENANCE_READY in its logs, then retry." >&2
@@ -94,7 +97,7 @@ fi
 
 running_services="$(docker compose ps --status running --services 2>/dev/null || true)"
 if printf '%s\n' "$running_services" | grep -Fxq agent; then
-    echo "Local Shahnoza is still running. Run 'make down' before cutover." >&2
+    echo "Local $AGENT_NAME is still running. Run 'make down' before cutover." >&2
     echo "Never run the local and Railway copies from the same Codex login." >&2
     exit 1
 fi
@@ -104,7 +107,7 @@ railway volume files --volume "$volume_id" upload \
     "$export_path" /codex/auth.json.next
 cleanup
 trap - EXIT
-echo "Codex login staged on the verified Shahnoza volume."
+echo "Codex login staged on the verified $AGENT_NAME volume."
 echo "Railway will validate it and atomically promote it to /codex/auth.json."
 echo "The temporary local export has been deleted."
-echo "Keep local Shahnoza stopped while the Railway deployment is active."
+echo "Keep local $AGENT_NAME stopped while the Railway deployment is active."

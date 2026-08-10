@@ -1,23 +1,23 @@
-# Put Shahnoza into production on Railway
+# Put your agent into production on Railway
 
-This is the easy, safe path for moving the working Shahnoza bot from this
-Ubuntu laptop to Railway. You do not need a Claude account, an OpenAI API key,
-or device-code login. Railway will reuse the bot's existing URL-based ChatGPT
-login through a private persistent volume.
+This is the easy, safe path for moving a working agent from an Ubuntu laptop
+to Railway. You do not need a Claude account, an OpenAI API key, or device-code
+login. Railway will reuse the bot's existing URL-based ChatGPT login through a
+private persistent volume.
 
 Allow roughly 20–40 minutes. Most of that time is Railway building the Python,
 Codex, and Chromium image.
 
 For dependable always-on use, the Railway **Hobby** plan is recommended. The
-Free plan is limited to 0.5 GB RAM per service, which can be tight when
-Shahnoza launches Chromium. Hobby currently has a $5 monthly minimum, with the
+Free plan is limited to 0.5 GB RAM per service, which can be tight when the
+agent launches Chromium. Hobby currently has a $5 monthly minimum, with the
 first $5 of resource usage included; set a spending limit after deployment.
 
 ## Before you start
 
 You need:
 
-- The local Shahnoza bot already working with `make up`.
+- The local agent already working with `make up`.
 - The `hamroh-custom-agent` repository visible in your GitHub account.
 - A Railway account connected to that GitHub account.
 - Your Telegram bot token and numeric Telegram user ID.
@@ -27,7 +27,7 @@ Important safety rules:
 
 - Never paste or upload `auth.json` to GitHub, Telegram, chat, a ticket, or a
   Railway variable. It is password-equivalent.
-- Never run local Shahnoza and Railway Shahnoza at the same time. Telegram
+- Never run the local and Railway copies at the same time. Telegram
   allows only one long-poller, and two copies can also rotate the same Codex
   refresh token and revoke one another.
 - Use `make down`, never `docker compose down -v`. The `-v` form deletes the
@@ -36,7 +36,11 @@ Important safety rules:
   active, do not run `make up`, `make auth`, `make auth-status`, or Codex
   logout locally. Those commands can refresh or revoke the copied login.
 
-## Part 1 — Create Shahnoza in Railway
+If this Railway deployment was created with an older, person-specific guide,
+rename its service to `agent` and its volume to `agent-data` before using the
+transfer commands below. Renaming these labels does not erase the volume.
+
+## Part 1 — Create the agent in Railway
 
 1. Open [Railway](https://railway.com/) and sign in with GitHub.
 
@@ -46,15 +50,16 @@ Important safety rules:
    approve access to this repository.
 
 4. Railway will normally name the new service `hamroh-custom-agent`. Open that
-   service's **Settings**, change its name to **Shahnoza**, and save. The rest
-   of this guide calls it the Shahnoza service.
+   service's **Settings**, change its name to **agent**, and save. This stable,
+   generic service name does not change when you rename the agent.
 
 5. Choose **Add Variables** rather than immediately deploying.
 
 6. Open the service's **Variables** tab, choose **Raw Editor**, and paste this
-   block. Replace only the first two values:
+   block. Replace the first three values:
 
    ```text
+   AGENT_NAME=choose_your_agent_name
    TELEGRAM_BOT_TOKEN=paste_your_BotFather_token_here
    HAMROH_OWNER_ID=paste_your_numeric_Telegram_user_ID_here
    HAMROH_PROVIDER=codex
@@ -66,7 +71,7 @@ Important safety rules:
    **Seal**. Do not add `OPENAI_API_KEY`, Claude variables, or Codex tokens.
 
 8. Return to the project canvas. Right-click an empty area and choose
-   **New Volume**. Connect it to the Shahnoza service and enter this exact
+   **New Volume**. Connect it to the `agent` service and enter this exact
    mount path:
 
    ```text
@@ -76,13 +81,13 @@ Important safety rules:
    After the volume appears, open its settings and name it exactly:
 
    ```text
-   shahnoza-data
+   agent-data
    ```
 
    This one volume stores the database, conversation session, memories,
    persona edits, skills, configuration, logs, and renewable Codex login.
 
-9. Open the Shahnoza service settings and check these items:
+9. Open the `agent` service settings and check these items:
 
    - Source branch: `main`
    - Replicas: `1`
@@ -90,7 +95,7 @@ Important safety rules:
    - Public domain: **none**
    - Healthcheck URL: **none**
 
-   Shahnoza is a background Telegram worker, not a website. She therefore
+   The agent is a background Telegram worker, not a website. It therefore
    needs no `PORT`, domain, or HTTP healthcheck.
 
 10. Review the staged changes and click **Deploy**. The first build can take a
@@ -103,7 +108,7 @@ Important safety rules:
     WAITING_FOR_CODEX_AUTH
     ```
 
-    This is not a failure. Shahnoza is safely waiting for the one-time private
+    This is not a failure. The agent is safely waiting for the one-time private
     login transfer.
 
 ## Part 2 — Install and connect the Railway command
@@ -111,7 +116,7 @@ Important safety rules:
 Open Terminal on the Ubuntu laptop and run:
 
 ```bash
-cd ~/Desktop/Projects/shahnoza-bot/hamroh-custom-agent
+cd /path/to/hamroh-custom-agent
 bash <(curl -fsSL railway.com/install.sh)
 exec bash
 ```
@@ -134,12 +139,12 @@ Link this folder to the project you just created:
 railway link
 ```
 
-When prompted, choose your Railway workspace, the Shahnoza project, the
-`production` environment, and the Shahnoza service. Then explicitly link the
-service that owns the volume:
+When prompted, choose your Railway workspace, your project, the `production`
+environment, and the `agent` service. Then explicitly link the service that
+owns the volume:
 
 ```bash
-railway service link Shahnoza
+railway service link agent
 ```
 
 Check the link:
@@ -148,7 +153,8 @@ Check the link:
 railway status
 ```
 
-The displayed project, environment, and service should all be Shahnoza's.
+The displayed project and environment should be yours, and the service should
+be `agent`.
 
 ## Part 3 — Make the production cutover
 
@@ -166,9 +172,9 @@ make railway-auth-upload
 
 The command does four things without displaying the credentials:
 
-1. Verifies the exact `shahnoza-data` volume belongs to the Shahnoza service
+1. Verifies the exact `agent-data` volume belongs to the `agent` service
    and is mounted at `/data`.
-2. Refuses to continue if local Shahnoza is still running, then performs a
+2. Refuses to continue if the local agent is still running, then performs a
    fresh account check without displaying credentials.
 3. Uploads the login as `/codex/auth.json.next`; Railway validates it and
    atomically promotes it to `/codex/auth.json`.
@@ -178,7 +184,7 @@ The command does four things without displaying the credentials:
 The final output should include:
 
 ```text
-Codex login staged on the verified Shahnoza volume.
+Codex login staged on the verified <your agent name> volume.
 Railway will validate it and atomically promote it to /codex/auth.json.
 The temporary local export has been deleted.
 ```
@@ -186,7 +192,7 @@ The temporary local export has been deleted.
 Within about 10 seconds, the waiting Railway container should notice the file
 and continue automatically. If it does not, click **Restart** on the service.
 
-## Part 4 — Confirm Shahnoza is live
+## Part 4 — Confirm the agent is live
 
 In Railway logs, look for these messages:
 
@@ -196,14 +202,15 @@ Codex runtime ready
 hamroh is live
 ```
 
-Then open Telegram and send Shahnoza:
+Then open Telegram and send the bot:
 
 ```text
 Introduce yourself
 ```
 
-If she replies normally and identifies herself as Shahnoza, production is
-working. Remove the duplicate login from the laptop without logging out:
+If it replies normally and identifies itself with the value you set in
+`AGENT_NAME`, production is working. Remove the duplicate login from the
+laptop without logging out:
 
 ```bash
 make railway-auth-retire-local
@@ -217,23 +224,23 @@ authenticating locally again.
 
 After the smoke test:
 
-1. Open the Shahnoza service → **Backups** and enable a daily backup.
+1. Open the `agent` service → **Backups** and enable a daily backup.
 2. Enable MFA on both Railway and GitHub.
 3. Keep Railway workspace membership restricted. Volume backups contain the
-   Codex login as well as Shahnoza's memories.
+   Codex login as well as the agent's memories.
 4. Configure a Railway spending alert/limit that suits you.
 5. Do not create a staging or PR copy with the same Telegram token or Codex
    login.
 
 GitHub pushes to `main` will automatically deploy a new image. The volume stays
 attached, so the database, login, memories, skills, access policy, reminders,
-and Shahnoza's own persona edits survive each deploy. A service with a volume
+and the agent's own persona edits survive each deploy. A service with a volume
 can have a short interruption during redeploy; that is expected.
 
 The persistent copies deliberately win over image seeds. Therefore, a later
 Git commit that changes an existing persona, skill, memory, access file,
 reminder, or plugin does not overwrite production. Make those changes through
-Shahnoza or a controlled volume edit; seed changes apply only to a new empty
+the agent or a controlled volume edit; seed changes apply only to a new empty
 volume. Never wipe the production volume just to apply a seed change.
 
 ## Troubleshooting
@@ -273,7 +280,7 @@ The earlier upload may still be finishing. Wait 10 seconds and check logs for
 rejecting it, remove only that staging file and retry:
 
 ```bash
-railway volume files --volume shahnoza-data delete \
+railway volume files --volume agent-data delete \
   /codex/auth.json.next --yes
 ```
 
@@ -283,7 +290,7 @@ Check that the volume mount path is exactly `/data`, then confirm only the
 filename (not its contents):
 
 ```bash
-railway volume files --volume shahnoza-data list /codex
+railway volume files --volume agent-data list /codex
 ```
 
 You should see `auth.json`. If it is absent, rerun `make railway-auth-upload`.
@@ -302,11 +309,11 @@ Then restart the Railway service. Keep exactly one production replica.
 
 Do this only when reauthentication is actually required:
 
-1. In Railway, open Shahnoza → **Variables**, add this value, and deploy the
+1. In Railway, open `agent` → **Variables**, add this value, and deploy the
    staged change:
 
    ```text
-   SHAHNOZA_MAINTENANCE=true
+   HAMROH_MAINTENANCE=true
    ```
 
 2. Wait until the active deployment logs show:
@@ -330,9 +337,9 @@ Do this only when reauthentication is actually required:
    ```
 
 5. Wait for `STAGED_CODEX_AUTH_READY` in Railway logs. Then delete only the
-   `SHAHNOZA_MAINTENANCE` variable and deploy that staged change.
+   `HAMROH_MAINTENANCE` variable and deploy that staged change.
 
-6. Test Telegram again. When Shahnoza answers, run
+6. Test Telegram again. When the agent answers, run
    `make railway-auth-retire-local` and type `RETIRE`.
 
 This sequence is important: Railway volume commands need an active deployment,
@@ -346,7 +353,7 @@ same login at once.
 - `railway.json` selects that image and prevents overlapping Telegram workers.
 - `scripts/railway_bootstrap.py` seeds missing volume files once, preserves
   every later edit, validates and atomically promotes staged credentials,
-  supports safe maintenance, and starts Shahnoza.
+  supports safe maintenance, and starts the configured agent.
 - `make railway-auth-upload` transfers the existing URL-authenticated Codex
   login without printing or committing it.
 

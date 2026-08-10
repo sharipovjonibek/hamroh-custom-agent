@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-image="${1:-shahnoza-agent:railway-test}"
-smoke_volume="shahnoza-railway-smoke-$$"
-maintenance_container="shahnoza-railway-maintenance-$$"
+image="${1:-custom-agent:railway-test}"
+smoke_volume="agent-railway-smoke-$$"
+maintenance_container="agent-railway-maintenance-$$"
 cleanup() {
     docker rm -f "$maintenance_container" >/dev/null 2>&1 || true
     docker volume rm "$smoke_volume" >/dev/null 2>&1 || true
@@ -85,7 +85,7 @@ docker run -d --name "$maintenance_container" \
     -v "$smoke_volume:/data" \
     -e RAILWAY_SERVICE_ID=smoke-service \
     -e RAILWAY_VOLUME_MOUNT_PATH=/data \
-    -e SHAHNOZA_MAINTENANCE=true \
+    -e HAMROH_MAINTENANCE=true \
     "$image" >/dev/null
 
 maintenance_ready=false
@@ -106,7 +106,7 @@ docker run --rm \
 import stat
 from pathlib import Path
 
-sentinel = Path("/data/.shahnoza-maintenance-ready")
+sentinel = Path("/data/.agent-maintenance-ready")
 assert sentinel.is_file()
 assert stat.S_IMODE(sentinel.stat().st_mode) == 0o600
 '
@@ -121,6 +121,6 @@ docker run --rm \
     python -c '
 from pathlib import Path
 
-assert not Path("/data/.shahnoza-maintenance-ready").exists()
+assert not Path("/data/.agent-maintenance-ready").exists()
 print("railway maintenance gate reset: ok")
 '

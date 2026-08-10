@@ -1,12 +1,14 @@
-# Shahnoza Telegram Agent
+# Configurable Telegram Agent
 
 A deployable Telegram AI assistant developed and customized by **Jonibek
 Sharipov**. It uses the [hamroh](https://github.com/sharipovjonibek/hamroh)
 runtime pinned as a git submodule under `framework/`; this repository owns
-Shahnoza's persona, skills, memories, MCP config, reminders, and access policy.
+the configured agent's persona, skills, memories, MCP config, reminders, and
+access policy.
 
-Shahnoza identifies Jonibek Sharipov as the developer of this version. Internal
-runtime implementation details are not part of her public-facing identity.
+The agent's display name comes from one setting, `AGENT_NAME`. It identifies
+Jonibek Sharipov as the developer of this version; internal runtime
+implementation details are not part of its public-facing identity.
 
 ## Setup
 
@@ -15,11 +17,11 @@ git clone --recurse-submodules https://github.com/sharipovjonibek/hamroh-custom-
 # already cloned without --recurse-submodules?
 git submodule update --init
 
-cp .env.example .env    # set TELEGRAM_BOT_TOKEN and HAMROH_OWNER_ID only
+cp .env.example .env    # set AGENT_NAME, TELEGRAM_BOT_TOKEN, HAMROH_OWNER_ID
 chmod 600 .env
 
 make auth               # build, then sign the bot into your ChatGPT account once
-make up                 # start Shahnoza
+make up                 # start the agent
 make logs
 ```
 
@@ -52,9 +54,32 @@ sudo usermod -aG docker "$USER"
 
 Do not work around that with `chmod 666 /var/run/docker.sock` or `sudo make up`.
 
+## Naming the agent
+
+Set the name once in `.env`:
+
+```dotenv
+AGENT_NAME=YourAgentName
+```
+
+Change that value and restart (`make up`) to reuse the deployment with a
+different name. The setting controls the model's identity, Telegram
+operational headings, Codex client metadata, login help, and maintenance
+messages. It does not require source-code, prompt, image, service, or volume
+renames.
+
+Telegram's profile name and `@username` are owned by BotFather, outside this
+repository. Update those separately if you want the public Telegram profile to
+match `AGENT_NAME`.
+
+An existing Railway deployment created before configurable naming may still
+use person-specific infrastructure labels. Rename its service to `agent` and
+its volume to `agent-data` once; later `AGENT_NAME` changes need no
+infrastructure rename and do not move or erase volume data.
+
 ## Production on Railway
 
-Shahnoza has a dedicated self-contained Railway image, one-volume persistence,
+The agent has a dedicated self-contained Railway image, one-volume persistence,
 and an exact-volume, staged transfer for the already-working URL-based Codex
 login. The bootstrap validates and atomically promotes credentials without
 printing them. No Claude account, OpenAI API key, public domain, or device-code
@@ -62,7 +87,7 @@ login is needed.
 
 Follow the beginner-friendly guide from start to finish:
 
-**[Deploy Shahnoza to Railway](docs/railway-deployment.md)**
+**[Deploy the agent to Railway](docs/railway-deployment.md)**
 
 The production volume preserves SQLite/session state, Codex authentication,
 memories, persona edits, skills, plugins, reminders, and access policy across
@@ -163,7 +188,7 @@ mounted live at runtime:
 The image still contains fallback copies of `project.md` and `skills/`, but the
 Compose deployment overlays them with this checkout. `project.md` is mounted as
 one file so it cannot hide the framework's `system.md`; `skills/` is mounted as
-a whole directory because this repo owns Shahnoza's complete custom skill set.
+a whole directory because this repo owns the agent's complete custom skill set.
 Prompts and the skill index are assembled at startup, so restart after editing
 either one.
 
@@ -181,7 +206,7 @@ either one.
 | File / dir | Configures | Git-tracked |
 |---|---|---|
 | `prompts/project.md` | Persona / developer-instruction overlay | ✅ |
-| `skills/` | Shahnoza-specific skill tree | ✅ |
+| `skills/` | Agent-specific skill tree | ✅ |
 | `memories/` | The bot's memory — it reads and writes here | ✅ |
 | `plugins.json` | Tools + MCP capability surface | ✅ |
 | `default-reminders.json` | Scheduled reminders | ✅ |
@@ -197,8 +222,8 @@ change afterward if you want it preserved in Git.
 
 ## Customizing
 
-- **Persona** → edit `prompts/project.md` (this checkout is already `Shahnoza`),
-  then `docker compose restart agent`.
+- **Name** → edit only `AGENT_NAME` in `.env`, then restart the agent.
+- **Persona** → edit `prompts/project.md`, then `docker compose restart agent`.
 - **Skills** → drop a `skills/<name>/SKILL.md` folder, then restart the agent.
 - **MCPs** → in `plugins.json` set an MCP `"enabled": true`, add its secret to
   `.env`, then `docker compose restart`. See `framework/docs/tools.md`.

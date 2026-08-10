@@ -1,10 +1,11 @@
 services:
   agent:
     build: .                    # your Dockerfile — FROM hamroh-base (built by `make`)
-    image: shahnoza-agent:local
+    image: custom-agent:local
     env_file: .env
     environment:
       CODEX_HOME: /var/lib/codex
+      AGENT_NAME: ${AGENT_NAME:?Set AGENT_NAME in .env}
     restart: on-failure
     volumes:
       # prompts/ stays baked in the Dockerfile so the framework's system.md
@@ -18,7 +19,7 @@ services:
       - ./prompts/project.md:/app/prompts/project.md
       # Skill playbooks — bind-mounted read-write so host edits AND the bot's
       # own write_skill land in this git-tracked checkout, live without a
-      # rebuild. This whole-directory mount is Shahnoza's complete custom
+      # rebuild. This whole-directory mount is the agent's complete custom
       # skill set and intentionally replaces the image's empty template tree.
       - ./skills:/app/skills
       # Read-write — the bot writes its own memories here; commit them
@@ -31,12 +32,13 @@ services:
     stop_grace_period: 15s
 
   codex-auth:
-    image: shahnoza-agent:local
+    image: custom-agent:local
     profiles: ["auth"]
     # Browser OAuth returns to localhost:1455 on this Ubuntu host.
     network_mode: host
     environment:
       CODEX_HOME: /var/lib/codex
+      AGENT_NAME: ${AGENT_NAME:?Set AGENT_NAME in .env}
     volumes:
       - codex-home:/var/lib/codex
     working_dir: /app

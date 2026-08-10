@@ -1,4 +1,4 @@
-"""H-001 checks for Shahnoza's deployed identity and public surfaces."""
+"""Checks for configurable deployed identity and clean public surfaces."""
 
 from pathlib import Path
 
@@ -23,7 +23,7 @@ FORBIDDEN = (
 )
 
 
-def test_deployed_prompt_identifies_shahnoza_and_jonibek() -> None:
+def test_deployed_prompt_uses_configurable_name_and_identifies_jonibek() -> None:
     effective_prompt = "\n".join(
         [
             (ROOT / "framework/prompts/system.md").read_text(encoding="utf-8"),
@@ -31,7 +31,8 @@ def test_deployed_prompt_identifies_shahnoza_and_jonibek() -> None:
         ]
     ).casefold()
 
-    assert "shahnoza" in effective_prompt
+    assert "agent_name" in effective_prompt
+    assert ("shah" + "noza") not in effective_prompt
     assert "jonibek sharipov" in effective_prompt
     assert "developed" in effective_prompt
     assert "customized" in effective_prompt
@@ -57,3 +58,17 @@ def test_operational_links_use_jonibeks_fork() -> None:
     assert UPSTREAM_NAME.casefold() not in gitmodules
     assert "github.com/sharipovjonibek/hamroh" in readme
     assert "github.com/sharipovjonibek/hamroh" in gitmodules
+
+
+def test_agent_name_has_one_environment_source_of_truth() -> None:
+    env_example = (ROOT / ".env.example").read_text(encoding="utf-8")
+    config = (ROOT / "framework/hamroh/config.py").read_text(encoding="utf-8")
+    startup = (ROOT / "framework/hamroh/startup.py").read_text(encoding="utf-8")
+    commands = (
+        ROOT / "framework/hamroh/telegram_io/commands.py"
+    ).read_text(encoding="utf-8")
+
+    assert "AGENT_NAME=YourAgentName" in env_example
+    assert 'agent_name_from_env()' in config
+    assert "agent_name=config.agent_name" in startup
+    assert "self.config.agent_name" in commands

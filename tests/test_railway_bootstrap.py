@@ -25,7 +25,7 @@ def _make_seed(root: Path) -> Path:
     (config / "access.json").write_text('{"policy":"owner_only"}', encoding="utf-8")
     (config / "default-reminders.json").write_text("[]", encoding="utf-8")
     (config / "plugins.json").write_text('{"version":1}', encoding="utf-8")
-    (config / "project.md").write_text("Shahnoza seed\n", encoding="utf-8")
+    (config / "project.md").write_text("Agent seed\n", encoding="utf-8")
     (seed / "skills").mkdir()
     (seed / "skills" / "README.md").write_text("skills seed\n", encoding="utf-8")
     (seed / "memories").mkdir()
@@ -74,7 +74,7 @@ def test_first_boot_seeds_and_wires_every_persistent_path(tmp_path: Path) -> Non
     )
 
     assert result == state
-    assert (state / "config" / "project.md").read_text() == "Shahnoza seed\n"
+    assert (state / "config" / "project.md").read_text() == "Agent seed\n"
     assert (state / "skills" / "README.md").is_file()
     assert (state / "memories" / "README.md").is_file()
     assert (app / "prompts" / "project.md").is_symlink()
@@ -243,6 +243,14 @@ def test_railway_runtime_requires_an_attached_volume() -> None:
     assert root == Path("/data")
 
 
+def test_non_railway_state_root_uses_generic_override() -> None:
+    root = railway_bootstrap.resolve_state_root(
+        {"HAMROH_STATE_ROOT": "/srv/custom-agent"}
+    )
+
+    assert root == Path("/srv/custom-agent")
+
+
 def test_railway_contract_uses_the_pinned_self_contained_image() -> None:
     config = json.loads((ROOT / "railway.json").read_text(encoding="utf-8"))
     assert config["build"] == {
@@ -257,6 +265,8 @@ def test_railway_contract_uses_the_pinned_self_contained_image() -> None:
     assert "FROM hamroh-base" not in dockerfile
     assert "3f8c53f8d1943d4813e4ad4c4d04f1692c015b4d" in dockerfile
     assert "railway_bootstrap.py" in dockerfile
+    assert "/opt/agent-seed" in dockerfile
+    assert ("SHAH" + "NOZA") not in dockerfile.upper()
     assert "astral-sh/uv:latest" not in dockerfile
 
     git = shutil.which("git")

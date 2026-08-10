@@ -4,7 +4,7 @@
 
 FROM python:3.11-slim@sha256:db3ff2e1800a8581e2c48a27c3995339d47bdf046da21c7627accd3d51053a93 AS framework-source
 
-ARG HAMROH_COMMIT=3f8c53f8d1943d4813e4ad4c4d04f1692c015b4d
+ARG HAMROH_COMMIT=72501882d3e536863caf198a3f9538de0bc893d9
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates git \
     && rm -rf /var/lib/apt/lists/* \
@@ -38,7 +38,7 @@ RUN apt-get update \
 COPY --from=builder /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:${PATH}" \
     PYTHONUNBUFFERED=1 \
-    SHAHNOZA_STATE_ROOT=/data \
+    HAMROH_STATE_ROOT=/data \
     HAMROH_DATA_DIR=/data/hamroh \
     CODEX_HOME=/data/codex \
     HAMROH_MEMORIES_DIR=/data/memories \
@@ -49,16 +49,16 @@ ENV PATH="/app/.venv/bin:${PATH}" \
 WORKDIR /app
 RUN /app/.venv/bin/playwright install --with-deps chromium
 
-# The engine is fetched at the exact commit pinned above. Mutable Shahnoza
+# The engine is fetched at the exact commit pinned above. Mutable agent
 # files are copied into a read-only seed directory; the bootstrap copies each
 # one into Railway's volume only when it is missing.
 COPY --from=framework-source /src/hamroh/ /app/hamroh/
 COPY --from=framework-source /src/prompts/ /app/prompts/
 COPY --from=framework-source /src/LICENSE /usr/share/licenses/hamroh/LICENSE
-COPY access.json default-reminders.json plugins.json /opt/shahnoza-seed/config/
-COPY prompts/project.md /opt/shahnoza-seed/config/project.md
-COPY skills/ /opt/shahnoza-seed/skills/
-COPY memories/ /opt/shahnoza-seed/memories/
+COPY access.json default-reminders.json plugins.json /opt/agent-seed/config/
+COPY prompts/project.md /opt/agent-seed/config/project.md
+COPY skills/ /opt/agent-seed/skills/
+COPY memories/ /opt/agent-seed/memories/
 COPY scripts/railway_bootstrap.py /app/scripts/railway_bootstrap.py
 
 ENTRYPOINT ["/usr/bin/tini", "--", "python", "/app/scripts/railway_bootstrap.py"]
