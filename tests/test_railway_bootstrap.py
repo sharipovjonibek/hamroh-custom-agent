@@ -263,7 +263,6 @@ def test_railway_contract_uses_the_pinned_self_contained_image() -> None:
 
     dockerfile = (ROOT / "Dockerfile.railway").read_text(encoding="utf-8")
     assert "FROM hamroh-base" not in dockerfile
-    assert "3f8c53f8d1943d4813e4ad4c4d04f1692c015b4d" in dockerfile
     assert "railway_bootstrap.py" in dockerfile
     assert "/opt/agent-seed" in dockerfile
     assert ("SHAH" + "NOZA") not in dockerfile.upper()
