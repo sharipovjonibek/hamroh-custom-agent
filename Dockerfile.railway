@@ -4,7 +4,7 @@
 
 FROM python:3.11-slim@sha256:db3ff2e1800a8581e2c48a27c3995339d47bdf046da21c7627accd3d51053a93 AS framework-source
 
-ARG HAMROH_COMMIT=65a4886e1b3f51fe0e47cf4bd1b6ae278545428e
+ARG HAMROH_COMMIT=60c1ce967c60254632f5c72e011038c67f0e5401
 RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates git \
     && rm -rf /var/lib/apt/lists/* \
