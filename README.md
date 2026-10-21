@@ -89,6 +89,9 @@ Follow the beginner-friendly guide from start to finish:
 
 **[Deploy the agent to Railway](docs/railway-deployment.md)**
 
+For an existing deployment with stale Codex packages or notification-router
+errors, follow [the runtime upgrade and verification commands](docs/railway-runtime-upgrade.md).
+
 The production volume preserves SQLite/session state, Codex authentication,
 memories, persona edits, skills, plugins, reminders, and access policy across
 deployments. Run only one replica, and stop the local bot before the production
@@ -104,7 +107,9 @@ new pointer:
 
 ```bash
 git submodule update --remote framework   # fetch + check out latest upstream
-git add framework && git commit -m "bump framework"
+python3 scripts/pin_railway_framework.py
+git add framework framework-revision.txt
+git commit -m "bump framework and Railway pin"
 make up
 ```
 
@@ -112,6 +117,10 @@ make up
 so you never hardcode a branch or merge into the detached HEAD by hand. On a
 deployed server, `make update` does this for you (see "Updating a deployed
 bot" below).
+
+`framework-revision.txt` selects the same commit for Railway builds, even
+when Railway does not check out submodules. Commit it with every framework
+bump. `python3 scripts/pin_railway_framework.py --check` detects drift.
 
 **You pulled this repo and the pointer moved** (someone else bumped it). A plain
 `git pull` updates the superproject but leaves `framework/` on the old commit.
@@ -151,10 +160,9 @@ those notes so the pull always goes through. Run the script by hand (or via
 cron) anytime you want the server's memories pushed sooner.
 
 `make update` also moves `framework/` to the latest upstream `main` and, if the
-pointer moved, commits and pushes the bump — so every update runs the newest
-framework without a separate bump step. Prefer a pinned, hand-picked framework
-commit? Drop `--remote framework` and the `git diff --quiet framework || …`
-line from the `update` target and bump manually as described above.
+pointer moved, commits and pushes the bump together with `framework-revision.txt`.
+For a hand-picked revision, check out that commit inside `framework/`, run
+`python3 scripts/pin_railway_framework.py`, and commit both pointers as above.
 
 If you and the bot ever edit the same memory file, git keeps both sides' lines
 (`merge=union` in `.gitattributes`) — no conflict markers to resolve by hand.

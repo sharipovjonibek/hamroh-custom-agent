@@ -99,6 +99,9 @@ def test_redeploy_never_overwrites_volume_customizations(tmp_path: Path) -> None
     railway_bootstrap.prepare_environment(
         environ={}, state_root=state, seed_root=seed, app_root=app
     )
+    auth_before = (state / "codex/auth.json").read_bytes()
+    (state / "hamroh/hamroh.db").write_bytes(b"existing database")
+    (state / "hamroh/session_id").write_text("saved-thread\n", encoding="utf-8")
     (state / "config" / "project.md").write_text(
         "owner production edit\n", encoding="utf-8"
     )
@@ -114,6 +117,9 @@ def test_redeploy_never_overwrites_volume_customizations(tmp_path: Path) -> None
 
     assert (state / "config" / "project.md").read_text() == ("owner production edit\n")
     assert (state / "skills" / "README.md").read_text() == ("production skill edit\n")
+    assert (state / "codex/auth.json").read_bytes() == auth_before
+    assert (state / "hamroh/hamroh.db").read_bytes() == b"existing database"
+    assert (state / "hamroh/session_id").read_text() == "saved-thread\n"
 
 
 def test_missing_auth_wait_condition_is_distinct(tmp_path: Path) -> None:
@@ -267,17 +273,20 @@ def test_railway_contract_uses_the_pinned_self_contained_image() -> None:
     assert "/opt/agent-seed" in dockerfile
     assert ("SHAH" + "NOZA") not in dockerfile.upper()
     assert "astral-sh/uv:latest" not in dockerfile
+    assert "ARG HAMROH_COMMIT" not in dockerfile
+    assert "COPY framework-revision.txt" in dockerfile
+    assert "verify_railway_runtime.py --expected-commit" in dockerfile
 
     git = shutil.which("git")
     if git is not None:
         result = subprocess.run(
-            [git, "rev-parse", "HEAD:framework"],
+            [git, "rev-parse", ":framework"],
             cwd=ROOT,
             check=False,
             capture_output=True,
             text=True,
         )
-        pinned = re.search(r"ARG HAMROH_COMMIT=([0-9a-f]{40})", dockerfile)
+        pinned = (ROOT / "framework-revision.txt").read_text(encoding="utf-8").strip()
         if result.returncode == 0:
-            assert pinned is not None
-            assert pinned.group(1) == result.stdout.strip()
+            assert re.fullmatch(r"[0-9a-f]{40}", pinned)
+            assert pinned == result.stdout.strip()

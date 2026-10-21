@@ -245,6 +245,11 @@ volume. Never wipe the production volume just to apply a seed change.
 
 ## Troubleshooting
 
+For stale Codex versions, the `_pending_turn_notifications` error, or a model
+request that requires a newer CLI, use [the runtime upgrade guide](railway-runtime-upgrade.md).
+It includes image provenance, dependency checks, and a ChatGPT-authenticated
+`gpt-5.6-sol` smoke turn on the existing volume.
+
 ### `railway: command not found`
 
 Start a fresh Terminal, or run:
@@ -348,8 +353,10 @@ same login at once.
 
 ## What the production files do
 
-- `Dockerfile.railway` builds the exact pinned Hamroh framework without
+- `Dockerfile.railway` builds the Hamroh revision in `framework-revision.txt` without
   depending on the laptop-only `hamroh-base` image or a checked-out submodule.
+- The final build and bootstrap verify both Codex distributions, the bundled
+  executable, the worker import, and the fetched framework revision.
 - `railway.json` selects that image and prevents overlapping Telegram workers.
 - `scripts/railway_bootstrap.py` seeds missing volume files once, preserves
   every later edit, validates and atomically promotes staged credentials,

@@ -16,7 +16,8 @@ update:
 	git pull --rebase
 	git submodule sync -- framework
 	git submodule update --init --remote framework
-	git diff --quiet framework || (git add framework && git commit -m "bump framework [skip ci]")
+	python3 scripts/pin_railway_framework.py
+	git diff --quiet HEAD -- framework framework-revision.txt || (git add framework framework-revision.txt && git commit -m "bump framework and Railway pin")
 	git push
 	$(MAKE) up
 
@@ -36,6 +37,7 @@ railway-auth-retire-local:
 	./scripts/retire-local-auth.sh
 
 railway-smoke:
+	python3 scripts/pin_railway_framework.py --check
 	docker build -f Dockerfile.railway -t custom-agent:railway-test .
 	./tests/smoke_railway_image.sh
 

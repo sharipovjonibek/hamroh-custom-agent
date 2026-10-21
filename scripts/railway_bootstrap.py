@@ -226,9 +226,15 @@ def prepare_environment(
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    from verify_railway_runtime import verify_image
+
     command = list(sys.argv[1:] if argv is None else argv)
     if not command:
         raise BootstrapError("no application command was supplied")
+    try:
+        verify_image()
+    except Exception as exc:
+        raise BootstrapError(f"image runtime verification failed: {exc}") from exc
     maintenance = _enabled(os.environ, "HAMROH_MAINTENANCE")
     state_root = resolve_state_root(os.environ)
     state_root.mkdir(parents=True, exist_ok=True)

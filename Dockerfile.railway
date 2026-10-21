@@ -4,8 +4,11 @@
 
 FROM python:3.11-slim@sha256:db3ff2e1800a8581e2c48a27c3995339d47bdf046da21c7627accd3d51053a93 AS framework-source
 
-ARG HAMROH_COMMIT=60c1ce967c60254632f5c72e011038c67f0e5401
-RUN apt-get update \
+# This file is kept in sync with the framework gitlink. A Railway variable or
+# cached build argument cannot silently override the selected source revision.
+COPY framework-revision.txt /tmp/framework-revision.txt
+RUN HAMROH_COMMIT="$(cat /tmp/framework-revision.txt)" \
+    && apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates git \
     && rm -rf /var/lib/apt/lists/* \
     && git init /src \
@@ -13,6 +16,7 @@ RUN apt-get update \
     && git -C /src fetch --depth=1 origin "${HAMROH_COMMIT}" \
     && git -C /src checkout --detach FETCH_HEAD \
     && test "$(git -C /src rev-parse HEAD)" = "${HAMROH_COMMIT}" \
+    && git -C /src rev-parse HEAD > /src/HAMROH_COMMIT \
     && rm -rf /src/.git
 
 
@@ -21,7 +25,7 @@ FROM python:3.11-slim@sha256:db3ff2e1800a8581e2c48a27c3995339d47bdf046da21c7627a
 COPY --from=ghcr.io/astral-sh/uv:0.11.29@sha256:eb2843a1e56fd9e30c7276ce1a52cba86e64c7b385f5e3279a0e08e02dd058fc /uv /usr/local/bin/uv
 WORKDIR /app
 COPY --from=framework-source /src/pyproject.toml /src/uv.lock ./
-RUN uv sync --frozen --no-install-project --no-cache
+RUN uv sync --frozen --no-dev --no-install-project --no-cache
 
 
 FROM python:3.11-slim@sha256:db3ff2e1800a8581e2c48a27c3995339d47bdf046da21c7627accd3d51053a93 AS runtime
@@ -49,17 +53,24 @@ ENV PATH="/app/.venv/bin:${PATH}" \
 WORKDIR /app
 RUN /app/.venv/bin/playwright install --with-deps chromium
 
-# The engine is fetched at the exact commit pinned above. Mutable agent
+# The engine is fetched at the exact commit in framework-revision.txt. Mutable agent
 # files are copied into a read-only seed directory; the bootstrap copies each
 # one into Railway's volume only when it is missing.
 COPY --from=framework-source /src/hamroh/ /app/hamroh/
 COPY --from=framework-source /src/prompts/ /app/prompts/
 COPY --from=framework-source /src/LICENSE /usr/share/licenses/hamroh/LICENSE
+COPY --from=framework-source /src/HAMROH_COMMIT /app/HAMROH_COMMIT
+COPY framework-revision.txt /app/framework-revision.txt
 COPY access.json default-reminders.json plugins.json /opt/agent-seed/config/
 COPY prompts/project.md /opt/agent-seed/config/project.md
 COPY skills/ /opt/agent-seed/skills/
 COPY memories/ /opt/agent-seed/memories/
 COPY scripts/railway_bootstrap.py /app/scripts/railway_bootstrap.py
+COPY scripts/verify_railway_runtime.py /app/scripts/verify_railway_runtime.py
+
+# Fail the build if a stale lock, incompatible SDK, or wrong CLI reaches the
+# final image. This reads no credentials and never initializes /data.
+RUN python /app/scripts/verify_railway_runtime.py --expected-commit "$(cat /app/framework-revision.txt)"
 
 ENTRYPOINT ["/usr/bin/tini", "--", "python", "/app/scripts/railway_bootstrap.py"]
 CMD ["python", "-m", "hamroh"]

@@ -10,6 +10,11 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# This must succeed without /data or credentials. It checks both distribution
+# metadata and the executable the worker will actually launch.
+docker run --rm --entrypoint python "$image" \
+    /app/scripts/verify_railway_runtime.py
+
 docker volume create "$smoke_volume" >/dev/null
 
 # Put a deliberately permissive staged login on the test volume. The bootstrap
@@ -48,6 +53,7 @@ docker run --rm \
     python -c '
 import os
 import stat
+import hashlib
 from pathlib import Path
 
 state = Path("/data")
@@ -61,6 +67,9 @@ assert stat.S_IMODE(auth.stat().st_mode) == 0o600
 assert stat.S_IMODE(auth.parent.stat().st_mode) == 0o700
 assert not (state / "codex/auth.json.next").exists()
 project.write_text("owner production edit\n", encoding="utf-8")
+(state / "hamroh/session_id").write_text("saved-thread\n", encoding="utf-8")
+(state / "hamroh/hamroh.db").write_bytes(b"persistent database sentinel")
+(state / "auth.sha256").write_text(hashlib.sha256(auth.read_bytes()).hexdigest())
 print("railway first boot: ok")
 '
 
@@ -73,9 +82,16 @@ docker run --rm \
     "$image" \
     python -c '
 from pathlib import Path
+import hashlib
 
 project = Path("/data/config/project.md")
 assert project.read_text(encoding="utf-8") == "owner production edit\n"
+state = Path("/data")
+assert (state / "hamroh/session_id").read_text() == "saved-thread\n"
+assert (state / "hamroh/hamroh.db").read_bytes() == b"persistent database sentinel"
+assert hashlib.sha256((state / "codex/auth.json").read_bytes()).hexdigest() == (
+    state / "auth.sha256"
+).read_text()
 print("railway persistent redeploy: ok")
 '
 
